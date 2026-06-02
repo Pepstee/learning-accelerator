@@ -1,11 +1,35 @@
 from __future__ import annotations
 
 import argparse
+import json
+import pathlib
 import sys
+
+from learner.content import ContentProcessor
+from learner.llm import ClaudeCliBackend
+
+_DATA_DIR = pathlib.Path("data")
 
 
 def cmd_ingest(args: argparse.Namespace) -> None:
-    raise NotImplementedError("ingest not yet implemented")
+    source = pathlib.Path(args.source)
+    try:
+        text = source.read_text(encoding="utf-8")
+    except OSError as exc:
+        print(f"error: cannot read {source}: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    processor = ContentProcessor(ClaudeCliBackend())
+    bundle = processor.process(text)
+
+    print(f"Summary: {bundle.summary}")
+    print(f"Cards:     {len(bundle.cards)}")
+    print(f"Questions: {len(bundle.questions)}")
+
+    _DATA_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = _DATA_DIR / f"{source.stem}.json"
+    out_path.write_text(json.dumps(bundle.to_dict(), indent=2), encoding="utf-8")
+    print(f"Saved: {out_path}")
 
 
 def cmd_review(args: argparse.Namespace) -> None:
