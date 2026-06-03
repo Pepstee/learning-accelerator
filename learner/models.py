@@ -34,3 +34,18 @@ class WeakArea:
     topic: str
     error_rate: float  # 0.0–1.0
     question_count: int
+
+
+@dataclass
+class CardRating:
+    card_front: str
+    topic: str
+    quality: int  # 0-5
+
+
+@dataclass
+class SessionRecord:
+    session_id: str
+    started_at: datetime.datetime
+    ratings: list[CardRating]
+    duration_seconds: float
