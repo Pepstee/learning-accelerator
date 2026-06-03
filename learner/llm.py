@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 from typing import Protocol
 
@@ -26,11 +27,24 @@ class ClaudeCliBackend:
 
 
 class MockBackend:
-    """Returns deterministic canned JSON for offline testing."""
+    """Returns deterministic canned responses for offline testing."""
 
-    _RESPONSE = (
-        '{"cards": [], "questions": [], "weak_areas": []}'
-    )
+    _CONTENT_JSON = json.dumps({
+        "summary": "Mock summary for offline testing.",
+        "cards": [
+            {"front": "What is spaced repetition?", "back": "A learning technique that uses increasing intervals between reviews."},
+        ],
+        "questions": [
+            {
+                "stem": "What does spaced repetition help with?",
+                "choices": ["Memory retention", "Speed reading", "Note-taking", "Summarising"],
+                "answer_index": 0,
+                "explanation": "Spaced repetition optimises long-term memory retention.",
+            }
+        ],
+    })
 
     def complete(self, prompt: str) -> str:
-        return self._RESPONSE
+        if "study coach" in prompt:
+            return "Mock study plan: review your weak topics for 30 minutes daily."
+        return self._CONTENT_JSON

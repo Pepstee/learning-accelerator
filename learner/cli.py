@@ -7,10 +7,26 @@ import sys
 
 from learner.analytics import compute_weak_areas, generate_study_plan
 from learner.content import ContentProcessor
-from learner.llm import ClaudeCliBackend
+from learner.llm import ClaudeCliBackend, MockBackend
 from learner.session import ReviewSession, load_session_history
 
 _DEFAULT_DATA_DIR = pathlib.Path.home() / ".learner"
+
+
+def _backend(args: argparse.Namespace):
+    return MockBackend() if args.mock else ClaudeCliBackend()
+
+
+def _load_bundle(data_dir: pathlib.Path, topic: str) -> dict:
+    path = data_dir / f"{topic}.json"
+    if not path.exists():
+        print(f"error: no bundle for '{topic}' — run 'learner ingest' first", file=sys.stderr)
+        sys.exit(1)
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"error: cannot read bundle: {exc}", file=sys.stderr)
+        sys.exit(1)
 
 
 def cmd_ingest(args: argparse.Namespace) -> None:
@@ -21,44 +37,103 @@ def cmd_ingest(args: argparse.Namespace) -> None:
         print(f"error: cannot read {source}: {exc}", file=sys.stderr)
         sys.exit(1)
 
-    processor = ContentProcessor(ClaudeCliBackend())
-    bundle = processor.process(text)
+    try:
+        processor = ContentProcessor(_backend(args))
+        bundle = processor.process(text)
+    except Exception as exc:
+        print(f"error: processing failed: {exc}", file=sys.stderr)
+        sys.exit(1)
 
-    print(f"Summary: {bundle.summary}")
+    args.data_dir.mkdir(parents=True, exist_ok=True)
+    out_path = args.data_dir / f"{source.stem}.json"
+    out_path.write_text(json.dumps(bundle.to_dict(), indent=2), encoding="utf-8")
+
+    print(f"Summary:   {bundle.summary}")
     print(f"Cards:     {len(bundle.cards)}")
     print(f"Questions: {len(bundle.questions)}")
-
-    data_dir: pathlib.Path = args.data_dir
-    data_dir.mkdir(parents=True, exist_ok=True)
-    out_path = data_dir / f"{source.stem}.json"
-    out_path.write_text(json.dumps(bundle.to_dict(), indent=2), encoding="utf-8")
-    print(f"Saved: {out_path}")
+    print(f"Saved:     {out_path}")
 
 
-def cmd_review(args: argparse.Namespace) -> None:
+def cmd_summary(args: argparse.Namespace) -> None:
+    data = _load_bundle(args.data_dir, args.topic)
+    print(data.get("summary", "(no summary available)"))
+
+
+def cmd_flashcards(args: argparse.Namespace) -> None:
+    data = _load_bundle(args.data_dir, args.topic)
+    cards = data.get("cards", [])
+    if not cards:
+        print("No flashcards found for this topic.")
+        return
+    for i, card in enumerate(cards, 1):
+        print(f"[{i}] Q: {card['front']}")
+        print(f"     A: {card['back']}")
+        print()
+
+
+def cmd_practice(args: argparse.Namespace) -> None:
     session = ReviewSession(data_dir=args.data_dir)
     session.run()
 
 
-def cmd_stats(args: argparse.Namespace) -> None:
-    history = load_session_history(args.data_dir)
-    if not history:
-        print("No session history found. Run 'learner review' first.")
+def cmd_exam(args: argparse.Namespace) -> None:
+    data = _load_bundle(args.data_dir, args.topic)
+    questions = data.get("questions", [])
+    if not questions:
+        print("No questions found for this topic.")
         return
 
+    score = 0
+    for i, q in enumerate(questions, 1):
+        print(f"\nQ{i}: {q['stem']}")
+        for j, choice in enumerate(q["choices"]):
+            print(f"  {j + 1}. {choice}")
+        while True:
+            raw = input("Your answer (1-4): ").strip()
+            if raw.isdigit() and 1 <= int(raw) <= 4:
+                break
+            print("Please enter a number 1-4.")
+        chosen = int(raw) - 1
+        correct = q["answer_index"]
+        if chosen == correct:
+            print("Correct!")
+            score += 1
+        else:
+            print(f"Wrong. Correct answer: {q['choices'][correct]}")
+        print(f"Explanation: {q['explanation']}")
+
+    print(f"\nScore: {score}/{len(questions)}")
+
+
+def cmd_study_plan(args: argparse.Namespace) -> None:
+    history = load_session_history(args.data_dir)
     weak_areas = compute_weak_areas(history)
+    if not weak_areas:
+        print("No weak areas identified. Keep up the great work!")
+        return
+    try:
+        plan = generate_study_plan(weak_areas, _backend(args))
+    except Exception as exc:
+        print(f"error: study plan generation failed: {exc}", file=sys.stderr)
+        sys.exit(1)
+    print(plan)
+
+
+def cmd_analytics(args: argparse.Namespace) -> None:
+    history = load_session_history(args.data_dir)
+    if not history:
+        print("No session history found. Complete some practice sessions first.")
+        return
+    weak_areas = compute_weak_areas(history)
+    total_reviews = sum(w.question_count for w in weak_areas)
+    print(f"Sessions:     {len(history)}")
+    print(f"Total reviews: {total_reviews}")
     if not weak_areas:
         print("No weak areas identified yet.")
         return
-
-    print("Weak areas (sorted by error rate):")
+    print("\nWeak areas (by error rate):")
     for w in weak_areas:
-        print(f"  {w.topic}: {w.error_rate:.0%} error rate ({w.question_count} card(s))")
-
-    if args.plan:
-        print("\nGenerating study plan...\n")
-        plan = generate_study_plan(weak_areas, ClaudeCliBackend())
-        print(plan)
+        print(f"  {w.topic}: {w.error_rate:.0%} error rate ({w.question_count} review(s))")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -71,24 +146,39 @@ def build_parser() -> argparse.ArgumentParser:
         type=pathlib.Path,
         default=_DEFAULT_DATA_DIR,
         metavar="DIR",
-        help=f"Directory for cards, SRS state, and sessions (default: {_DEFAULT_DATA_DIR})",
+        help=f"Data directory (default: {_DEFAULT_DATA_DIR})",
+    )
+    parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Use mock LLM backend for offline testing.",
     )
     sub = parser.add_subparsers(dest="command", metavar="COMMAND")
 
-    ingest = sub.add_parser("ingest", help="Ingest source material and generate cards/questions.")
-    ingest.add_argument("source", help="Path to the material to ingest.")
-    ingest.set_defaults(func=cmd_ingest)
+    p = sub.add_parser("ingest", help="Ingest source material and generate cards/questions.")
+    p.add_argument("source", help="Path to the source file to ingest.")
+    p.set_defaults(func=cmd_ingest)
 
-    review = sub.add_parser("review", help="Start an interactive review session.")
-    review.set_defaults(func=cmd_review)
+    p = sub.add_parser("summary", help="Print the summary for an ingested topic.")
+    p.add_argument("topic", help="Topic name (file stem, e.g. 'notes' for notes.json).")
+    p.set_defaults(func=cmd_summary)
 
-    stats = sub.add_parser("stats", help="Show study statistics and weak areas.")
-    stats.add_argument(
-        "--plan",
-        action="store_true",
-        help="Generate an AI study plan for the identified weak areas.",
-    )
-    stats.set_defaults(func=cmd_stats)
+    p = sub.add_parser("flashcards", help="List all flashcards for a topic.")
+    p.add_argument("topic", help="Topic name.")
+    p.set_defaults(func=cmd_flashcards)
+
+    p = sub.add_parser("practice", help="Interactive SRS review session.")
+    p.set_defaults(func=cmd_practice)
+
+    p = sub.add_parser("exam", help="Multiple-choice quiz for a topic.")
+    p.add_argument("topic", help="Topic name.")
+    p.set_defaults(func=cmd_exam)
+
+    p = sub.add_parser("study-plan", help="Generate an AI study plan based on weak areas.")
+    p.set_defaults(func=cmd_study_plan)
+
+    p = sub.add_parser("analytics", help="Show study analytics and weak areas.")
+    p.set_defaults(func=cmd_analytics)
 
     return parser
 
