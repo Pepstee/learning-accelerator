@@ -1,18 +1,6 @@
 from __future__ import annotations
 
-from learner.llm import LLMBackend
-from learner.models import SessionRecord, WeakArea
-
-_STUDY_PLAN_PROMPT = """\
-You are a study coach. The learner's spaced-repetition sessions have identified the following \
-weak areas (sorted by error rate, highest first):
-
-{weak_area_lines}
-
-Write a concise, actionable study plan. For each topic give specific improvement techniques, \
-suggested resources, and a weekly schedule. Be encouraging and practical. Respond in plain text \
-without markdown headers.
-"""
+from learner.models import AnalyticsReport, SessionRecord, StudyPlan, WeakArea
 
 
 def compute_weak_areas(history: list[SessionRecord]) -> list[WeakArea]:
@@ -31,13 +19,27 @@ def compute_weak_areas(history: list[SessionRecord]) -> list[WeakArea]:
     return weak
 
 
-def generate_study_plan(weak_areas: list[WeakArea], backend: LLMBackend) -> str:
-    if not weak_areas:
-        return "No weak areas identified. Keep up the great work!"
+def build_analytics_report(weak_areas: list[WeakArea]) -> AnalyticsReport:
+    total_reviews = sum(w.question_count for w in weak_areas)
+    return AnalyticsReport(
+        sessions=0,
+        total_reviews=total_reviews,
+        weak_areas=list(weak_areas),
+    )
 
-    lines = [
-        f"- {w.topic}: error rate {w.error_rate:.0%} over {w.question_count} card(s)"
-        for w in weak_areas
-    ]
-    prompt = _STUDY_PLAN_PROMPT.format(weak_area_lines="\n".join(lines))
-    return backend.complete(prompt)
+
+def generate_study_plan(weak_areas: list[WeakArea]) -> StudyPlan:
+    sorted_areas = sorted(weak_areas, key=lambda w: w.error_rate, reverse=True)
+
+    if not sorted_areas:
+        advice = "No weak areas identified. Keep up the great work!"
+    else:
+        parts: list[str] = []
+        for w in sorted_areas:
+            parts.append(
+                f"{w.topic} ({w.error_rate:.0%} error rate, {w.question_count} review(s)):"
+                " review core concepts and practise additional exercises."
+            )
+        advice = " ".join(parts)
+
+    return StudyPlan(weak_areas=sorted_areas, advice=advice)
