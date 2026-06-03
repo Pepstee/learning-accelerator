@@ -14,7 +14,10 @@ _DEFAULT_DATA_DIR = pathlib.Path.home() / ".learner"
 
 
 def _backend(args: argparse.Namespace):
-    return MockBackend() if args.mock else ClaudeCliBackend()
+    import os
+    if args.mock or os.environ.get("LEARNER_MOCK"):
+        return MockBackend()
+    return ClaudeCliBackend()
 
 
 def _load_bundle(data_dir: pathlib.Path, topic: str) -> dict:

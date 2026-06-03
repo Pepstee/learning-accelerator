@@ -1,0 +1,60 @@
+# Photosynthesis: How Plants Capture Light Energy
+
+Photosynthesis is the fundamental process by which plants, algae, and certain bacteria convert
+light energy into chemical energy stored as glucose. This process is the foundation of almost all
+life on Earth, as it produces the oxygen we breathe and the organic compounds that form the base
+of most food chains.
+
+## The Light-Dependent Reactions
+
+The first stage of photosynthesis occurs in the thylakoid membranes of the chloroplast. When
+sunlight strikes chlorophyll and other pigment molecules, electrons are energised and passed along
+the electron transport chain. This movement of electrons drives the synthesis of ATP and NADPH,
+two energy-carrying molecules essential for the next stage.
+
+During this stage, water molecules are split in a process called photolysis. Each water molecule
+yields two hydrogen ions, two electrons, and one oxygen atom. The oxygen atoms combine to form O2,
+which is released as a by-product — the oxygen that sustains aerobic life on Earth. The hydrogen
+ions and electrons are passed to NADP+ to form NADPH.
+
+Light energy is captured by two photosystems: Photosystem II absorbs light at 680 nm and
+Photosystem I absorbs light at 700 nm. They work in tandem to drive the production of both ATP
+and NADPH from ADP, NADP+, and the electrons extracted from water.
+
+## The Calvin Cycle (Light-Independent Reactions)
+
+The second stage takes place in the stroma of the chloroplast. Using the ATP and NADPH produced
+in the light-dependent reactions, the Calvin cycle fixes atmospheric carbon dioxide into organic
+molecules through a series of enzyme-catalysed steps.
+
+Carbon dioxide is incorporated into a five-carbon molecule called ribulose bisphosphate (RuBP) by
+the enzyme RuBisCO — the most abundant enzyme on Earth. The resulting six-carbon intermediate
+immediately splits into two three-carbon molecules of 3-phosphoglycerate (3-PGA). ATP and NADPH
+then reduce these molecules to glyceraldehyde-3-phosphate (G3P), a versatile three-carbon sugar.
+
+Most G3P is used to regenerate RuBP, keeping the cycle running. A smaller fraction is drawn off
+to synthesise glucose, sucrose, starch, and other organic compounds that fuel the plant's growth
+and metabolism. Three turns of the Calvin cycle are needed to produce one molecule of G3P net.
+
+## Factors Affecting the Rate of Photosynthesis
+
+Several environmental and internal factors regulate how quickly photosynthesis proceeds.
+
+**Light intensity** is often the primary limiting factor. As light levels rise, the rate of
+photosynthesis increases until another factor becomes limiting. Very high intensities can damage
+the photosystems through photo-oxidation.
+
+**Carbon dioxide concentration** limits the Calvin cycle. Modern atmospheric CO2 (~420 ppm) is
+below the optimum for many crops, which is why greenhouses sometimes elevate CO2 levels to boost
+yields.
+
+**Temperature** affects enzyme activity. Photosynthesis peaks at an optimal temperature —
+typically 25–35 °C for most plants — and declines sharply above or below that range as enzymes
+denature or slow down.
+
+**Water availability** matters because water is both a raw material (providing electrons via
+photolysis) and a regulator of stomatal opening. Drought causes stomata to close, restricting CO2
+entry and dramatically slowing the Calvin cycle.
+
+Understanding these factors is critical for agriculture, ecology, and efforts to engineer more
+efficient crops in a changing climate.
