@@ -55,8 +55,8 @@ class MockLLM(LLMBackend):
 MockBackend = MockLLM
 
 
-def get_backend(mock: bool = False) -> LLMBackend:
-    """Return the appropriate backend based on environment or the mock flag."""
-    if mock or os.environ.get("LEARNER_MOCK"):
+def get_backend(backend: str | bool = "auto") -> LLMBackend:
+    """Return a backend by name ("mock", "claude") or legacy bool flag."""
+    if backend == "mock" or backend is True or os.environ.get("LEARNER_MOCK"):
         return MockLLM()
     return ClaudeCliBackend()
