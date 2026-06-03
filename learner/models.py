@@ -12,6 +12,10 @@ class Flashcard:
     interval: float = 1.0  # days
     ease: float = 2.5
 
+    @property
+    def due_date(self) -> datetime.datetime:
+        return self.due
+
 
 # Backwards-compat alias used by content.py / session.py
 Card = Flashcard
