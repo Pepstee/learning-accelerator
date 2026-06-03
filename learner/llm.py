@@ -1,19 +1,20 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
-from typing import Protocol
+from abc import ABC, abstractmethod
 
 
-class LLMBackend(Protocol):
-    def complete(self, prompt: str) -> str:
-        ...
+class LLMBackend(ABC):
+    @abstractmethod
+    def complete(self, prompt: str) -> str: ...
 
 
-class ClaudeCliBackend:
+class ClaudeCliBackend(LLMBackend):
     """Calls the 'claude' CLI subprocess and returns its stdout."""
 
-    def __init__(self, model: str = "claude-sonnet-4-5") -> None:
+    def __init__(self, model: str = "claude-sonnet-4-6") -> None:
         self.model = model
 
     def complete(self, prompt: str) -> str:
@@ -26,7 +27,7 @@ class ClaudeCliBackend:
         return result.stdout.strip()
 
 
-class MockBackend:
+class MockLLM(LLMBackend):
     """Returns deterministic canned responses for offline testing."""
 
     _CONTENT_JSON = json.dumps({
@@ -48,3 +49,14 @@ class MockBackend:
         if "study coach" in prompt:
             return "Mock study plan: review your weak topics for 30 minutes daily."
         return self._CONTENT_JSON
+
+
+# Backwards-compat alias
+MockBackend = MockLLM
+
+
+def get_backend(mock: bool = False) -> LLMBackend:
+    """Return the appropriate backend based on environment or the mock flag."""
+    if mock or os.environ.get("LEARNER_MOCK"):
+        return MockLLM()
+    return ClaudeCliBackend()
