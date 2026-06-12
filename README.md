@@ -23,9 +23,11 @@ learner --help
 | Command | Description |
 |---------|-------------|
 | `ingest <source>` | Ingest source material and generate cards/questions |
+| `generate <source>` | Generate flashcards and questions from source material |
 | `summary <topic>` | Print the summary for an ingested topic |
 | `flashcards <topic>` | List all flashcards for a topic |
 | `practice` | Interactive SRS review session |
+| `review` | Interactive flashcard and question review session |
 | `exam <topic>` | Multiple-choice quiz for a topic |
 | `study-plan` | Generate a study plan based on weak areas |
 | `analytics` | Show study analytics and weak areas |
@@ -36,6 +38,9 @@ learner --help
 # Ingest a local text file (uses mock backend for offline testing)
 learner --mock ingest notes.txt
 
+# Generate flashcards and questions from source material
+learner --mock generate notes.txt
+
 # Print the summary for an ingested topic
 learner summary notes
 
@@ -44,6 +49,9 @@ learner flashcards notes
 
 # Start an interactive SRS review session
 learner practice
+
+# Start an interactive review session (flashcards + questions)
+learner review
 
 # Run a multiple-choice exam for a topic
 learner exam notes

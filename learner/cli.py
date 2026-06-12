@@ -125,6 +125,53 @@ def cmd_exam(args: argparse.Namespace) -> None:
     print(f"\nScore: {score}/{len(questions)}")
 
 
+def cmd_generate(args: argparse.Namespace) -> None:
+    source = pathlib.Path(args.source)
+    try:
+        text = source.read_text(encoding="utf-8")
+    except OSError as exc:
+        print(f"error: cannot read {source}: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        backend = _backend(args)
+        chunks = [text]
+        summary = generate_summary(chunks, backend)
+        cards = generate_flashcards(chunks, backend)
+        questions = generate_questions(chunks, backend)
+    except Exception as exc:
+        print(f"error: generation failed: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    args.data_dir.mkdir(parents=True, exist_ok=True)
+    out_path = args.data_dir / f"{source.stem}.json"
+    bundle = {
+        "summary": summary,
+        "cards": [{"front": c.front, "back": c.back} for c in cards],
+        "questions": [
+            {
+                "stem": q.stem,
+                "choices": q.choices,
+                "answer_index": q.answer_index,
+                "explanation": q.explanation,
+            }
+            for q in questions
+        ],
+    }
+    out_path.write_text(json.dumps(bundle, indent=2), encoding="utf-8")
+
+    print(f"Summary:   {summary}")
+    print(f"Cards:     {len(cards)}")
+    print(f"Questions: {len(questions)}")
+    print(f"Saved:     {out_path}")
+
+
+def cmd_review(args: argparse.Namespace) -> None:
+    from learner.review_view import ReviewView
+    session = ReviewSession(data_dir=args.data_dir)
+    ReviewView().run(session)
+
+
 def cmd_study_plan(args: argparse.Namespace) -> None:
     history = load_session_history(args.data_dir)
     weak_areas = compute_weak_areas(history)
@@ -175,6 +222,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("source", help="Path to the source file to ingest.")
     p.set_defaults(func=cmd_ingest)
 
+    p = sub.add_parser("generate", help="Generate flashcards and questions from source material.")
+    p.add_argument("source", help="Path to the source file.")
+    p.set_defaults(func=cmd_generate)
+
     p = sub.add_parser("summary", help="Print the summary for an ingested topic.")
     p.add_argument("topic", help="Topic name (file stem, e.g. 'notes' for notes.json).")
     p.set_defaults(func=cmd_summary)
@@ -185,6 +236,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("practice", help="Interactive SRS review session.")
     p.set_defaults(func=cmd_practice)
+
+    p = sub.add_parser("review", help="Interactive flashcard and question review session.")
+    p.set_defaults(func=cmd_review)
 
     p = sub.add_parser("exam", help="Multiple-choice quiz for a topic.")
     p.add_argument("topic", help="Topic name.")
@@ -206,3 +260,7 @@ def main(argv: list[str] | None = None) -> None:
         parser.print_help()
         sys.exit(0)
     args.func(args)
+
+
+if __name__ == "__main__":
+    main()
