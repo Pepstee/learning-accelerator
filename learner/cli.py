@@ -90,6 +90,20 @@ def cmd_flashcards(args: argparse.Namespace) -> None:
         print()
 
 
+def cmd_questions(args: argparse.Namespace) -> None:
+    data = _load_bundle(args.data_dir, args.topic)
+    questions = data.get("questions", [])
+    if not questions:
+        print("No questions found for this topic.")
+        return
+    for i, q in enumerate(questions, 1):
+        print(f"[{i}] Q: {q['stem']}")
+        for j, choice in enumerate(q["choices"]):
+            print(f"     {j + 1}. {choice}")
+        print(f"     Answer: {q['choices'][q['answer_index']]}")
+        print()
+
+
 def cmd_practice(args: argparse.Namespace) -> None:
     from learner.review_view import ReviewView
     session = ReviewSession(data_dir=args.data_dir)
@@ -225,6 +239,10 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("generate", help="Generate flashcards and questions from source material.")
     p.add_argument("source", help="Path to the source file.")
     p.set_defaults(func=cmd_generate)
+
+    p = sub.add_parser("questions", help="List all questions for a topic.")
+    p.add_argument("topic", help="Topic name.")
+    p.set_defaults(func=cmd_questions)
 
     p = sub.add_parser("summary", help="Print the summary for an ingested topic.")
     p.add_argument("topic", help="Topic name (file stem, e.g. 'notes' for notes.json).")
