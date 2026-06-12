@@ -6,7 +6,7 @@ import pathlib
 import sys
 
 from learner.analytics import compute_weak_areas, generate_study_plan
-from learner.content import ContentProcessor
+from learner.generator import generate_flashcards, generate_questions, generate_summary
 from learner.llm import ClaudeCliBackend, MockBackend
 from learner.session import ReviewSession, load_session_history
 
@@ -41,19 +41,35 @@ def cmd_ingest(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     try:
-        processor = ContentProcessor(_backend(args))
-        bundle = processor.process(text)
+        backend = _backend(args)
+        chunks = [text]
+        summary = generate_summary(chunks, backend)
+        cards = generate_flashcards(chunks, backend)
+        questions = generate_questions(chunks, backend)
     except Exception as exc:
         print(f"error: processing failed: {exc}", file=sys.stderr)
         sys.exit(1)
 
     args.data_dir.mkdir(parents=True, exist_ok=True)
     out_path = args.data_dir / f"{source.stem}.json"
-    out_path.write_text(json.dumps(bundle.to_dict(), indent=2), encoding="utf-8")
+    bundle = {
+        "summary": summary,
+        "cards": [{"front": c.front, "back": c.back} for c in cards],
+        "questions": [
+            {
+                "stem": q.stem,
+                "choices": q.choices,
+                "answer_index": q.answer_index,
+                "explanation": q.explanation,
+            }
+            for q in questions
+        ],
+    }
+    out_path.write_text(json.dumps(bundle, indent=2), encoding="utf-8")
 
-    print(f"Summary:   {bundle.summary}")
-    print(f"Cards:     {len(bundle.cards)}")
-    print(f"Questions: {len(bundle.questions)}")
+    print(f"Summary:   {summary}")
+    print(f"Cards:     {len(cards)}")
+    print(f"Questions: {len(questions)}")
     print(f"Saved:     {out_path}")
 
 
@@ -75,8 +91,9 @@ def cmd_flashcards(args: argparse.Namespace) -> None:
 
 
 def cmd_practice(args: argparse.Namespace) -> None:
+    from learner.review_view import ReviewView
     session = ReviewSession(data_dir=args.data_dir)
-    session.run()
+    ReviewView().run(session)
 
 
 def cmd_exam(args: argparse.Namespace) -> None:
@@ -114,12 +131,8 @@ def cmd_study_plan(args: argparse.Namespace) -> None:
     if not weak_areas:
         print("No weak areas identified. Keep up the great work!")
         return
-    try:
-        plan = generate_study_plan(weak_areas, _backend(args))
-    except Exception as exc:
-        print(f"error: study plan generation failed: {exc}", file=sys.stderr)
-        sys.exit(1)
-    print(plan)
+    plan = generate_study_plan(weak_areas)
+    print(plan.advice)
 
 
 def cmd_analytics(args: argparse.Namespace) -> None:
