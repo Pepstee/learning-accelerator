@@ -30,6 +30,47 @@ class TestEmptyAndWhitespaceInputs:
 
 class TestMarkdownHeadingSplit:
 
+    def test_preamble_before_first_heading_is_preserved(self):
+        text = "Introductory preamble.\n\n# Section\nSection body."
+        chunks = ingest_text(text)
+        assert [chunk.metadata["generation_text"] for chunk in chunks] == [
+            "Introductory preamble.",
+            "Section\nSection body.",
+        ]
+
+    def test_heading_inside_fence_remains_literal_content(self):
+        text = "Before.\n\n```md\n# Literal example\n```\n\nAfter."
+        chunks = ingest_text(text)
+        assert [chunk.metadata["generation_text"] for chunk in chunks] == [
+            "Before.",
+            "```md\n# Literal example\n```",
+            "After.",
+        ]
+
+    @pytest.mark.parametrize(
+        ("opening", "false_close", "closing"),
+        [
+            ("```md", "```not-a-close", "```"),
+            ("~~~md", "~~~not-a-close", "~~~"),
+        ],
+    )
+    def test_fence_marker_with_trailing_text_is_not_a_close(
+        self, opening, false_close, closing
+    ):
+        text = (
+            f"{opening}\n# literal one\n{false_close}\n# literal two\n{closing}\n"
+            "# Real\nBody"
+        )
+        chunks = ingest_text(text)
+        assert [chunk.metadata["generation_text"] for chunk in chunks] == [
+            f"{opening}\n# literal one\n{false_close}\n# literal two\n{closing}",
+            "Real\nBody",
+        ]
+
+    def test_heading_and_identical_body_are_both_preserved(self):
+        chunks = ingest_text("# Same\nSame")
+        assert chunks[0].metadata["generation_text"] == "Same\nSame"
+
     def test_h2_headings_produce_titled_chunks(self):
         text = "## Alpha\nContent A.\n\n## Beta\nContent B."
         chunks = ingest_text(text)
@@ -132,6 +173,7 @@ class TestParagraphFallback:
         text = "Just one line of text."
         chunks = ingest_text(text)
         assert len(chunks) == 1
+        assert chunks[0].metadata["generation_text"] == text
 
     def test_multiple_blank_lines_treated_as_paragraph_separator(self):
         text = "Para A.\n\n\n\nPara B."

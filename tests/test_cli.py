@@ -254,6 +254,101 @@ def test_ingest_mock_path_calls_backend_once(tmp_path, monkeypatch):
     assert data == json.loads(MockBackend._CONTENT_JSON)
 
 
+def test_generate_routes_markdown_sections_as_distinct_chunks(tmp_path, monkeypatch):
+    source = tmp_path / "sections.md"
+    source.write_text("# Alpha\nA body.\n\n## Beta\nB body.", encoding="utf-8")
+    backend = object()
+    calls: list[tuple[str, list[str], object]] = []
+
+    monkeypatch.setattr(cli_module, "_backend", lambda args: backend)
+    monkeypatch.setattr(
+        cli_module,
+        "generate_summary",
+        lambda chunks, actual: calls.append(("summary", chunks, actual)) or "summary",
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "generate_flashcards",
+        lambda chunks, actual: calls.append(("cards", chunks, actual)) or [],
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "generate_questions",
+        lambda chunks, actual: calls.append(("questions", chunks, actual)) or [],
+    )
+
+    main(["--data-dir", str(tmp_path), "generate", str(source)])
+
+    expected = ["Alpha\nA body.", "Beta\nB body."]
+    assert calls == [
+        ("summary", expected, backend),
+        ("cards", expected, backend),
+        ("questions", expected, backend),
+    ]
+
+
+def test_generate_preserves_preamble_and_fenced_literal_heading(tmp_path, monkeypatch):
+    source = tmp_path / "literals.md"
+    source.write_text(
+        "Before.\n\n```md\n# Literal example\n```\n\n# Section\nSame\nSame",
+        encoding="utf-8",
+    )
+    seen: list[list[str]] = []
+    monkeypatch.setattr(cli_module, "_backend", lambda args: object())
+    monkeypatch.setattr(
+        cli_module,
+        "generate_summary",
+        lambda chunks, backend: seen.append(chunks) or "summary",
+    )
+    monkeypatch.setattr(cli_module, "generate_flashcards", lambda chunks, backend: [])
+    monkeypatch.setattr(cli_module, "generate_questions", lambda chunks, backend: [])
+
+    main(["--data-dir", str(tmp_path), "generate", str(source)])
+
+    assert seen == [
+        ["Before.\n\n```md\n# Literal example\n```", "Section\nSame\nSame"]
+    ]
+
+
+def test_generate_routes_paragraphs_without_duplicating_single_line(tmp_path, monkeypatch):
+    source = tmp_path / "paragraphs.txt"
+    source.write_text("First line\ncontinues.\n\nSecond paragraph.", encoding="utf-8")
+    seen: list[list[str]] = []
+    monkeypatch.setattr(cli_module, "_backend", lambda args: object())
+    monkeypatch.setattr(
+        cli_module,
+        "generate_summary",
+        lambda chunks, backend: seen.append(chunks) or "summary",
+    )
+    monkeypatch.setattr(cli_module, "generate_flashcards", lambda chunks, backend: [])
+    monkeypatch.setattr(cli_module, "generate_questions", lambda chunks, backend: [])
+
+    main(["--data-dir", str(tmp_path), "generate", str(source)])
+
+    assert seen == [["First line\ncontinues.", "Second paragraph."]]
+
+
+@pytest.mark.parametrize("text", ["", " \n\t "])
+def test_generate_preserves_empty_source_as_one_exact_chunk(
+    tmp_path, monkeypatch, text
+):
+    source = tmp_path / "empty.txt"
+    source.write_text(text, encoding="utf-8")
+    seen: list[list[str]] = []
+    monkeypatch.setattr(cli_module, "_backend", lambda args: object())
+    monkeypatch.setattr(
+        cli_module,
+        "generate_summary",
+        lambda chunks, backend: seen.append(chunks) or "summary",
+    )
+    monkeypatch.setattr(cli_module, "generate_flashcards", lambda chunks, backend: [])
+    monkeypatch.setattr(cli_module, "generate_questions", lambda chunks, backend: [])
+
+    main(["--data-dir", str(tmp_path), "generate", str(source)])
+
+    assert seen == [[text]]
+
+
 # ---------------------------------------------------------------------------
 # summary
 # ---------------------------------------------------------------------------

@@ -8,6 +8,7 @@ import sys
 from learner.analytics import compute_weak_areas, generate_study_plan
 from learner.content import ContentProcessor
 from learner.generator import generate_flashcards, generate_questions, generate_summary
+from learner.ingest import ingest_text
 from learner.llm import ClaudeCliBackend, MockBackend
 from learner.session import ReviewSession, load_session_history
 
@@ -31,6 +32,13 @@ def _load_bundle(data_dir: pathlib.Path, topic: str) -> dict:
     except (OSError, json.JSONDecodeError) as exc:
         print(f"error: cannot read bundle: {exc}", file=sys.stderr)
         sys.exit(1)
+
+
+def _generation_chunks(text: str, source: pathlib.Path) -> list[str]:
+    chunks = ingest_text(text, source=str(source))
+    if not chunks:
+        return [text]
+    return [chunk.metadata["generation_text"] for chunk in chunks]
 
 
 def cmd_ingest(args: argparse.Namespace) -> None:
@@ -133,7 +141,7 @@ def cmd_generate(args: argparse.Namespace) -> None:
 
     try:
         backend = _backend(args)
-        chunks = [text]
+        chunks = _generation_chunks(text, source)
         summary = generate_summary(chunks, backend)
         cards = generate_flashcards(chunks, backend)
         questions = generate_questions(chunks, backend)
