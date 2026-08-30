@@ -6,7 +6,9 @@ import pathlib
 
 import pytest
 
+import learner.cli as cli_module
 from learner.cli import build_parser, main
+from learner.llm import MockBackend
 
 
 # ---------------------------------------------------------------------------
@@ -183,6 +185,73 @@ def test_ingest_creates_data_dir_if_absent(tmp_path):
     main(["--mock", "--data-dir", str(new_dir), "ingest", str(source)])
     assert new_dir.exists()
     assert (new_dir / "file.json").exists()
+
+
+class _RecordingBackend:
+    def __init__(self, response: str) -> None:
+        self.response = response
+        self.prompts: list[str] = []
+
+    def complete(self, prompt: str) -> str:
+        self.prompts.append(prompt)
+        return self.response
+
+
+def test_ingest_uses_one_strict_backend_generation(tmp_path, monkeypatch):
+    source = tmp_path / "atomic.txt"
+    source.write_text("One source must produce one coherent bundle.", encoding="utf-8")
+    expected = _minimal_bundle(n_cards=2, n_questions=1)
+    backend = _RecordingBackend(json.dumps(expected))
+    monkeypatch.setattr(cli_module, "_backend", lambda args: backend)
+
+    main(["--data-dir", str(tmp_path), "ingest", str(source)])
+
+    assert len(backend.prompts) == 1
+    assert "One source must produce one coherent bundle." in backend.prompts[0]
+    assert json.loads((tmp_path / "atomic.json").read_text(encoding="utf-8")) == expected
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        "not JSON",
+        json.dumps({"summary": "incomplete", "cards": []}),
+    ],
+)
+def test_ingest_refuses_invalid_bundle_without_partial_write(
+    tmp_path, monkeypatch, capsys, response
+):
+    source = tmp_path / "invalid.txt"
+    source.write_text("Invalid output must not become a bundle.", encoding="utf-8")
+    backend = _RecordingBackend(response)
+    monkeypatch.setattr(cli_module, "_backend", lambda args: backend)
+
+    with pytest.raises(SystemExit) as exc_info:
+        main(["--data-dir", str(tmp_path), "ingest", str(source)])
+
+    assert exc_info.value.code == 1
+    assert len(backend.prompts) == 1
+    assert not (tmp_path / "invalid.json").exists()
+    assert "processing failed" in capsys.readouterr().err
+
+
+def test_ingest_mock_path_calls_backend_once(tmp_path, monkeypatch):
+    source = tmp_path / "offline.txt"
+    source.write_text("Offline ingestion remains deterministic.", encoding="utf-8")
+    calls: list[str] = []
+    original = MockBackend.complete
+
+    def recording_complete(self, prompt: str) -> str:
+        calls.append(prompt)
+        return original(self, prompt)
+
+    monkeypatch.setattr(MockBackend, "complete", recording_complete)
+
+    main(["--mock", "--data-dir", str(tmp_path), "ingest", str(source)])
+
+    assert len(calls) == 1
+    data = json.loads((tmp_path / "offline.json").read_text(encoding="utf-8"))
+    assert data == json.loads(MockBackend._CONTENT_JSON)
 
 
 # ---------------------------------------------------------------------------

@@ -6,6 +6,7 @@ import pathlib
 import sys
 
 from learner.analytics import compute_weak_areas, generate_study_plan
+from learner.content import ContentProcessor
 from learner.generator import generate_flashcards, generate_questions, generate_summary
 from learner.llm import ClaudeCliBackend, MockBackend
 from learner.session import ReviewSession, load_session_history
@@ -41,35 +42,18 @@ def cmd_ingest(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     try:
-        backend = _backend(args)
-        chunks = [text]
-        summary = generate_summary(chunks, backend)
-        cards = generate_flashcards(chunks, backend)
-        questions = generate_questions(chunks, backend)
+        bundle = ContentProcessor(_backend(args)).process(text)
     except Exception as exc:
         print(f"error: processing failed: {exc}", file=sys.stderr)
         sys.exit(1)
 
     args.data_dir.mkdir(parents=True, exist_ok=True)
     out_path = args.data_dir / f"{source.stem}.json"
-    bundle = {
-        "summary": summary,
-        "cards": [{"front": c.front, "back": c.back} for c in cards],
-        "questions": [
-            {
-                "stem": q.stem,
-                "choices": q.choices,
-                "answer_index": q.answer_index,
-                "explanation": q.explanation,
-            }
-            for q in questions
-        ],
-    }
-    out_path.write_text(json.dumps(bundle, indent=2), encoding="utf-8")
+    out_path.write_text(json.dumps(bundle.to_dict(), indent=2), encoding="utf-8")
 
-    print(f"Summary:   {summary}")
-    print(f"Cards:     {len(cards)}")
-    print(f"Questions: {len(questions)}")
+    print(f"Summary:   {bundle.summary}")
+    print(f"Cards:     {len(bundle.cards)}")
+    print(f"Questions: {len(bundle.questions)}")
     print(f"Saved:     {out_path}")
 
 
