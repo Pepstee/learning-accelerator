@@ -184,7 +184,7 @@ def cmd_study_plan(args: argparse.Namespace) -> None:
     if not weak_areas:
         print("No weak areas identified. Keep up the great work!")
         return
-    plan = generate_study_plan(weak_areas)
+    plan = generate_study_plan(weak_areas, _backend(args))
     print(plan.advice)
 
 

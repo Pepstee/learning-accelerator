@@ -493,6 +493,8 @@ def test_study_plan_with_weak_areas_produces_plan(tmp_path, capsys):
     main(["--mock", "--data-dir", str(tmp_path), "study-plan"])
     out = capsys.readouterr().out
     assert len(out.strip()) > 0
+    assert "math" in out
+    assert "Mock study plan" in out
 
 
 def test_study_plan_with_weak_areas_does_not_exit_nonzero(tmp_path):

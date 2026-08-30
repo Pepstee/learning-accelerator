@@ -285,6 +285,52 @@ class TestGenerateStudyPlanSingleTopic:
         assert "100%" in result.advice
 
 
+class TestGenerateStudyPlanBackend:
+    class RecordingBackend:
+        def __init__(self, response: str = "Provider-specific weekly plan.") -> None:
+            self.response = response
+            self.prompts: list[str] = []
+
+        def complete(self, prompt: str) -> str:
+            self.prompts.append(prompt)
+            return self.response
+
+    def test_backend_is_called_once_for_non_empty_weak_areas(self):
+        backend = self.RecordingBackend()
+        generate_study_plan([_weak("calculus", 0.6, 5)], backend)
+        assert len(backend.prompts) == 1
+
+    def test_backend_prompt_binds_sorted_topics_and_evidence(self):
+        backend = self.RecordingBackend()
+        generate_study_plan(
+            [_weak("easy", 0.2, 2), _weak("hard", 0.8, 7)], backend
+        )
+        prompt = backend.prompts[0]
+        assert "study coach" in prompt
+        assert prompt.index("hard") < prompt.index("easy")
+        assert "80%" in prompt
+        assert "7 review(s)" in prompt
+        assert "suggested resources" in prompt
+        assert "weekly schedule" in prompt
+
+    def test_backend_advice_extends_deterministic_evidence_summary(self):
+        backend = self.RecordingBackend("Tailored provider advice.")
+        result = generate_study_plan([_weak("calculus", 0.6, 5)], backend)
+        assert result.advice.startswith("calculus (60% error rate, 5 review(s)):")
+        assert result.advice.endswith("Tailored provider advice.")
+
+    def test_empty_backend_response_keeps_deterministic_advice(self):
+        backend = self.RecordingBackend(" \n")
+        result = generate_study_plan([_weak("calculus", 0.6, 5)], backend)
+        assert result.advice == generate_study_plan([_weak("calculus", 0.6, 5)]).advice
+
+    def test_empty_weak_areas_do_not_call_backend(self):
+        backend = self.RecordingBackend()
+        result = generate_study_plan([], backend)
+        assert backend.prompts == []
+        assert result.advice == "No weak areas identified. Keep up the great work!"
+
+
 class TestGenerateStudyPlanMultipleTopics:
     def test_all_topics_present_in_advice(self):
         areas = [_weak("topology", 0.8, 10), _weak("real_analysis", 0.6, 5)]

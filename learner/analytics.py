@@ -1,6 +1,19 @@
 from __future__ import annotations
 
+from learner.llm import LLMBackend
 from learner.models import AnalyticsReport, SessionRecord, StudyPlan, WeakArea
+
+
+_STUDY_PLAN_PROMPT = """\
+You are a study coach. The learner's spaced-repetition sessions have identified the following \
+weak areas (sorted by error rate, highest first):
+
+{weak_area_lines}
+
+Write a concise, actionable study plan. For each topic give specific improvement techniques, \
+suggested resources, and a weekly schedule. Be encouraging and practical. Respond in plain text \
+without markdown headers.
+"""
 
 
 def compute_weak_areas(history: list[SessionRecord]) -> list[WeakArea]:
@@ -28,7 +41,7 @@ def build_analytics_report(weak_areas: list[WeakArea], *, sessions: int = 0) -> 
     )
 
 
-def generate_study_plan(weak_areas: list[WeakArea]) -> StudyPlan:
+def generate_study_plan(weak_areas: list[WeakArea], backend: LLMBackend | None = None) -> StudyPlan:
     sorted_areas = sorted(weak_areas, key=lambda w: w.error_rate, reverse=True)
 
     if not sorted_areas:
@@ -41,5 +54,15 @@ def generate_study_plan(weak_areas: list[WeakArea]) -> StudyPlan:
                 " review core concepts and practise additional exercises."
             )
         advice = " ".join(parts)
+        if backend is not None:
+            weak_area_lines = "\n".join(
+                f"- {w.topic}: error rate {w.error_rate:.0%} over {w.question_count} review(s)"
+                for w in sorted_areas
+            )
+            generated = backend.complete(
+                _STUDY_PLAN_PROMPT.format(weak_area_lines=weak_area_lines)
+            ).strip()
+            if generated:
+                advice = f"{advice}\n\n{generated}"
 
     return StudyPlan(weak_areas=sorted_areas, advice=advice)
