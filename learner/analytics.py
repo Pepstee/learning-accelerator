@@ -19,10 +19,10 @@ def compute_weak_areas(history: list[SessionRecord]) -> list[WeakArea]:
     return weak
 
 
-def build_analytics_report(weak_areas: list[WeakArea]) -> AnalyticsReport:
+def build_analytics_report(weak_areas: list[WeakArea], *, sessions: int = 0) -> AnalyticsReport:
     total_reviews = sum(w.question_count for w in weak_areas)
     return AnalyticsReport(
-        sessions=0,
+        sessions=sessions,
         total_reviews=total_reviews,
         weak_areas=list(weak_areas),
     )

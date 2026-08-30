@@ -439,7 +439,18 @@ def test_analytics_with_history_shows_session_count(tmp_path, capsys):
     _write_session(tmp_path, "python", quality=4)
     main(["--mock", "--data-dir", str(tmp_path), "analytics"])
     out = capsys.readouterr().out
-    assert "Sessions:" in out
+    assert "Sessions:     1" in out
+
+
+def test_analytics_counts_every_persisted_session(tmp_path, capsys):
+    _write_session(tmp_path, "python", quality=4)
+    session_path = tmp_path / "sessions" / "20240101T100000.json"
+    session_path.rename(session_path.with_name("20240101T100000-python.json"))
+    _write_session(tmp_path, "algebra", quality=2)
+    main(["--mock", "--data-dir", str(tmp_path), "analytics"])
+    out = capsys.readouterr().out
+    assert "Sessions:     2" in out
+    assert "Total reviews: 2" in out
 
 
 def test_analytics_with_history_shows_total_reviews(tmp_path, capsys):

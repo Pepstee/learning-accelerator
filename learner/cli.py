@@ -5,7 +5,7 @@ import json
 import pathlib
 import sys
 
-from learner.analytics import compute_weak_areas, generate_study_plan
+from learner.analytics import build_analytics_report, compute_weak_areas, generate_study_plan
 from learner.content import ContentProcessor
 from learner.generator import generate_flashcards, generate_questions, generate_summary
 from learner.ingest import ingest_text
@@ -194,14 +194,14 @@ def cmd_analytics(args: argparse.Namespace) -> None:
         print("No session history found. Complete some practice sessions first.")
         return
     weak_areas = compute_weak_areas(history)
-    total_reviews = sum(w.question_count for w in weak_areas)
-    print(f"Sessions:     {len(history)}")
-    print(f"Total reviews: {total_reviews}")
-    if not weak_areas:
+    report = build_analytics_report(weak_areas, sessions=len(history))
+    print(f"Sessions:     {report.sessions}")
+    print(f"Total reviews: {report.total_reviews}")
+    if not report.weak_areas:
         print("No weak areas identified yet.")
         return
     print("\nWeak areas (by error rate):")
-    for w in weak_areas:
+    for w in report.weak_areas:
         print(f"  {w.topic}: {w.error_rate:.0%} error rate ({w.question_count} review(s))")
 
 

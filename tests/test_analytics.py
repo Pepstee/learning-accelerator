@@ -191,6 +191,10 @@ class TestBuildAnalyticsReport:
         report = build_analytics_report([_weak("math", 0.4, 3)])
         assert report.sessions == 0
 
+    def test_explicit_session_count_is_preserved(self):
+        report = build_analytics_report([_weak("math", 0.4, 3)], sessions=4)
+        assert report.sessions == 4
+
     def test_total_reviews_sums_question_counts(self):
         areas = [_weak("math", 0.4, 3), _weak("bio", 0.6, 7)]
         report = build_analytics_report(areas)
