@@ -71,6 +71,42 @@ def _record(
 
 # ── _load_questions ───────────────────────────────────────────────────────────
 
+class _CardSession:
+    """Minimal ReviewView session for exercising the due-card path."""
+
+    def __init__(
+        self,
+        data_dir: pathlib.Path,
+        due_cards: list[tuple[Card, str]],
+    ) -> None:
+        self._data_dir = data_dir
+        self._sessions_dir = data_dir / "sessions"
+        self._due_cards = list(due_cards)
+        self.saved_cards: list[Card] = []
+
+    def _load_due_cards(self) -> list[tuple[Card, str]]:
+        return list(self._due_cards)
+
+    def _save_srs_state(self, card: Card) -> None:
+        self.saved_cards.append(card)
+
+
+def _due_card(
+    front: str = "What is torque?",
+    back: str = "r × F",
+    *,
+    interval: float = 1.0,
+    ease: float = 2.5,
+) -> Card:
+    return Card(
+        front=front,
+        back=back,
+        due=datetime.datetime.utcnow() - datetime.timedelta(hours=2),
+        interval=interval,
+        ease=ease,
+    )
+
+
 class TestLoadQuestions:
     def test_empty_data_dir_returns_empty_list(self, tmp_path: pathlib.Path):
         result = _load_questions(_session(tmp_path))
@@ -366,3 +402,104 @@ class TestReviewViewRunQuestionsOnly:
         monkeypatch.setattr("builtins.input", lambda _: "B")
         ReviewView().run(_session(tmp_path))
         assert not (tmp_path / "srs").exists()
+
+
+class TestReviewViewRunDueCards:
+    def test_front_reveal_and_back_precede_rating_prompt(
+        self,
+        tmp_path: pathlib.Path,
+        monkeypatch,
+        capsys,
+    ) -> None:
+        session = _CardSession(tmp_path, [(_due_card(), "mechanics")])
+        before_rating: list[str] = []
+        prompts: list[str] = []
+
+        def answer(prompt: str = "") -> str:
+            prompts.append(prompt)
+            before_rating.append(capsys.readouterr().out)
+            return "4"
+
+        monkeypatch.setattr("learner.review_view._getch", lambda: "k")
+        monkeypatch.setattr("builtins.input", answer)
+
+        ReviewView().run(session)
+
+        assert prompts == ["Rating 1-5 (1=forgot, 5=perfect): "]
+        output = before_rating[0]
+        front_at = output.index("What is torque?")
+        reveal_at = output.index("[press any key to reveal]")
+        back_at = output.index("r × F")
+        assert front_at < reveal_at < back_at
+
+    @pytest.mark.parametrize(
+        ("quality", "interval", "expected"),
+        [("1", 14.0, 1.0), ("2", 7.0, 1.0), ("5", 6.0, 15.0)],
+    )
+    def test_rating_updates_and_saves_exact_sm2_interval(
+        self,
+        tmp_path: pathlib.Path,
+        monkeypatch,
+        quality: str,
+        interval: float,
+        expected: float,
+    ) -> None:
+        card = _due_card(interval=interval)
+        session = _CardSession(tmp_path, [(card, "physics")])
+        monkeypatch.setattr("learner.review_view._getch", lambda: "k")
+        monkeypatch.setattr("builtins.input", lambda _prompt="": quality)
+
+        record = ReviewView().run(session)
+
+        assert len(session.saved_cards) == 1
+        assert session.saved_cards[0].interval == pytest.approx(expected)
+        assert record.ratings == [
+            CardRating(card_front=card.front, topic="physics", quality=int(quality))
+        ]
+
+    def test_invalid_ratings_reprompt_before_one_valid_rating(
+        self,
+        tmp_path: pathlib.Path,
+        monkeypatch,
+        capsys,
+    ) -> None:
+        session = _CardSession(tmp_path, [(_due_card(), "mechanics")])
+        responses = iter(["abc", "0", "6", "3"])
+        prompts: list[str] = []
+
+        def answer(prompt: str = "") -> str:
+            prompts.append(prompt)
+            return next(responses)
+
+        monkeypatch.setattr("learner.review_view._getch", lambda: "k")
+        monkeypatch.setattr("builtins.input", answer)
+
+        record = ReviewView().run(session)
+
+        assert record.ratings[0].quality == 3
+        assert prompts == ["Rating 1-5 (1=forgot, 5=perfect): "] * 4
+        assert capsys.readouterr().out.count("Enter a number from 1 to 5.") == 3
+
+    def test_multiple_cards_save_each_state_and_one_complete_session(
+        self,
+        tmp_path: pathlib.Path,
+        monkeypatch,
+    ) -> None:
+        cards = [
+            (_due_card("Q1", "A1"), "math"),
+            (_due_card("Q2", "A2"), "science"),
+            (_due_card("Q3", "A3"), "history"),
+        ]
+        session = _CardSession(tmp_path, cards)
+        responses = iter(["3", "4", "5"])
+        monkeypatch.setattr("learner.review_view._getch", lambda: "k")
+        monkeypatch.setattr("builtins.input", lambda _prompt="": next(responses))
+
+        record = ReviewView().run(session)
+
+        assert len(session.saved_cards) == 3
+        files = list(session._sessions_dir.glob("*.json"))
+        assert len(files) == 1
+        persisted = json.loads(files[0].read_text(encoding="utf-8"))
+        assert [item["quality"] for item in persisted["ratings"]] == [3, 4, 5]
+        assert persisted["session_id"] == record.session_id
