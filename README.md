@@ -24,6 +24,7 @@ learner --help
 |---------|-------------|
 | `ingest <source>` | Ingest source material and generate cards/questions |
 | `generate <source>` | Generate flashcards and questions from source material |
+| `questions <topic>` | List questions and their answers for a topic |
 | `summary <topic>` | Print the summary for an ingested topic |
 | `flashcards <topic>` | List all flashcards for a topic |
 | `practice` | Interactive SRS review session |
@@ -40,6 +41,9 @@ learner --mock ingest notes.txt
 
 # Generate flashcards and questions from source material
 learner --mock generate notes.txt
+
+# List questions and their answers for a topic
+learner questions notes
 
 # Print the summary for an ingested topic
 learner summary notes
@@ -59,9 +63,13 @@ learner exam notes
 # Show analytics and weak areas
 learner analytics
 
-# Generate a study plan based on weak areas
-learner study-plan
+# Generate a study plan based on weak areas without calling the production backend
+learner --mock study-plan
 ```
+
+`ingest` and `generate` currently accept local UTF-8 text files. Without
+`--mock` (or `LEARNER_MOCK=1`), generation and non-empty study plans use the
+configured production Claude CLI backend.
 
 ## Architecture
 
