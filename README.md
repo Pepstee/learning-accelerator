@@ -1,5 +1,21 @@
 # learner
 
+## ArtVault installation
+
+On this ArtVault host the project workspace is
+`/srv/artvault/projects/learning-accelerator/workspace`. From that directory,
+run the installed tool with:
+
+```sh
+../.venv/bin/learner --help
+```
+
+The reconciled build passed 1019 tests on both Mac and Linux. Offline
+acceptance testing uses a labelled mock backend (`--mock`); production AI
+generation still requires Claude CLI installation and authentication. Always
+pass an explicit `--data-dir` for learning data, since personal learning data
+was excluded from this workspace.
+
 An AI-powered spaced-repetition learning accelerator.  Feed it source material
 and it generates flashcards and multiple-choice questions, tracks your
 performance, and surfaces your weak areas so you study smarter.
