@@ -81,3 +81,24 @@ configured production Claude CLI backend.
 - `learner/session.py` — `ReviewSession` (SRS state + session history); `load_session_history`
 - `learner/srs.py` — SM-2 spaced-repetition scheduling
 - `learner/cli.py` — `argparse`-based CLI wired to all subcommand handlers
+
+## Migration scope
+
+The canonical baseline `bc2ca0ff` already contains the capability union. Both
+registered donor worktrees share `699a19b`; their named Python capabilities are
+retained, including the `Card` and `MockBackend` compatibility aliases. Structured
+ingestion, generated study plans, analytics and due-card review evidence are
+connected to the current workflow. The study-plan library now returns a structured
+`StudyPlan`; callers read `.advice` instead of expecting the historical plain string.
+Old compiled bytecode is intentionally omitted.
+
+The deterministic `graphify-out` index covers tracked Python code; document
+semantics are not indexed. User learning data under `~/.learner` is excluded from
+source migration. Use an explicit `--data-dir` for test or migrated datasets.
+The offline acceptance workflow uses a labelled mock backend. Production
+content generation still requires the configured Claude CLI and authentication;
+that provider is not installed or verified on ArtVault by this source migration.
+
+Untracked donor test variants were compared with the canonical suites. Their
+production behaviour is already covered; generic dataclass assertions and
+serialisation implemented only inside donor tests are intentionally not copied.
